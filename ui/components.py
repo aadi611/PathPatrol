@@ -47,55 +47,69 @@ def render_complaint_form(on_submit_callback):
         
         st.info("💡 **Tip:** Search for your location worldwide - cities, streets, landmarks!")
         
-        # Location search input
-        location_search = st.text_input(
-            "🔍 Search Location *",
-            placeholder="Type to search: 'New York', 'Tokyo', 'London', 'Paris'...",
-            help="Start typing to search for locations worldwide",
-            key="location_search"
-        )
+        # Location search with integrated dropdown
+        col1, col2 = st.columns([3, 1])
         
-        # Search and display results
+        with col1:
+            location_search = st.text_input(
+                "🔍 Search Location *",
+                placeholder="Start typing: 'New York', 'Tokyo', 'London', 'Paris'...",
+                help="Type at least 3 characters to search",
+                key="location_search"
+            )
+        
+        with col2:
+            if location_search and len(location_search) >= 3:
+                st.markdown("<br>", unsafe_allow_html=True)
+                with st.spinner("🔍"):
+                    pass
+        
+        # Search and display dropdown immediately below search box
         selected_location = None
         selected_coords = None
         
         if location_search and len(location_search) >= 3:
-            with st.spinner("🔍 Searching locations..."):
+            with st.spinner("Searching locations..."):
                 results = location_service.search_locations(location_search, limit=15)
             
             if results:
-                # Create dropdown options
-                location_options = ["-- Select a location --"] + [
-                    result['display_name'] for result in results
-                ]
+                # Create dropdown options with clean formatting
+                location_options = {
+                    "-- Select your location from the list below --": None
+                }
                 
-                # Dropdown menu for selection
-                selected_option = st.selectbox(
-                    "📍 Select Location from Dropdown:",
-                    options=location_options,
+                for result in results:
+                    # Format the display nicely
+                    display = result['display_name']
+                    location_options[display] = result
+                
+                # Dropdown menu appears right below search
+                selected_display = st.selectbox(
+                    "Select from search results:",
+                    options=list(location_options.keys()),
                     key="location_dropdown",
-                    help="Choose the exact location from the dropdown menu"
+                    help="Choose the exact location from the dropdown"
                 )
                 
                 # Process selection
-                if selected_option and selected_option != "-- Select a location --":
-                    # Find the selected result
-                    selected_idx = location_options.index(selected_option) - 1
-                    selected_location = results[selected_idx]['display_name']
-                    selected_coords = (
-                        results[selected_idx]['latitude'],
-                        results[selected_idx]['longitude']
-                    )
-                    
-                    # Display selected details in a nice card
-                    st.success(f"✅ Selected Location")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("📍 Latitude", f"{selected_coords[0]:.6f}°")
-                    with col2:
-                        st.metric("📍 Longitude", f"{selected_coords[1]:.6f}°")
+                if selected_display != "-- Select your location from the list below --":
+                    selected_result = location_options[selected_display]
+                    if selected_result:
+                        selected_location = selected_result['display_name']
+                        selected_coords = (
+                            selected_result['latitude'],
+                            selected_result['longitude']
+                        )
+                        
+                        # Display selected details in nice cards
+                        st.success(f"✅ Location Selected!")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.metric("📍 Latitude", f"{selected_coords[0]:.6f}°")
+                        with col2:
+                            st.metric("📍 Longitude", f"{selected_coords[1]:.6f}°")
             else:
-                st.warning("⚠️ No locations found. Try a different search term or enter manually below.")
+                st.warning("⚠️ No locations found. Try a different search or use manual entry below.")
         
         # Manual location entry (fallback)
         st.markdown("**Or enter location manually:**")
@@ -248,11 +262,11 @@ def render_complaint_card(complaint: Complaint, show_image: bool = True):
                     image_path = service.get_image_path(photo_path)
                     if image_path.exists():
                         with cols[idx % 3]:
-                            st.image(str(image_path), use_container_width=True)
+                            st.image(str(image_path), use_column_width=True)
             elif len(photo_paths) == 1:
                 image_path = service.get_image_path(photo_paths[0])
                 if image_path.exists():
-                    st.image(str(image_path), use_container_width=True)
+                    st.image(str(image_path), use_column_width=True)
         except Exception as e:
             st.warning(f"Could not load images: {e}")
     
