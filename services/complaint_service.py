@@ -16,7 +16,7 @@ class ComplaintService:
     
     def submit_complaint(
         self,
-        uploaded_file,
+        uploaded_files,  # Can be single file or list
         location: str,
         latitude: Optional[float],
         longitude: Optional[float],
@@ -30,14 +30,23 @@ class ComplaintService:
             Complaint ID if successful, None otherwise
         """
         try:
-            # Save image
-            photo_path = self.storage.save_image(uploaded_file)
-            if not photo_path:
+            # Handle single or multiple files
+            if not isinstance(uploaded_files, list):
+                uploaded_files = [uploaded_files]
+            
+            # Save all images
+            photo_paths = []
+            for uploaded_file in uploaded_files:
+                photo_path = self.storage.save_image(uploaded_file)
+                if photo_path:
+                    photo_paths.append(photo_path)
+            
+            if not photo_paths:
                 return None
             
             # Create complaint object
             complaint = Complaint(
-                photo_path=photo_path,
+                photo_path=';'.join(photo_paths),  # Store multiple paths separated by semicolon
                 location=location,
                 latitude=latitude,
                 longitude=longitude,
@@ -87,3 +96,37 @@ class ComplaintService:
     def get_image_path(self, relative_path: str):
         """Get absolute image path"""
         return self.storage.get_image_path(relative_path)
+    
+    def search_complaints(self, search_term: str) -> List[Complaint]:
+        """Search complaints"""
+        return self.db.search_complaints(search_term)
+    
+    def filter_by_date_range(self, start_date: str, end_date: str) -> List[Complaint]:
+        """Filter by date range"""
+        return self.db.filter_by_date_range(start_date, end_date)
+    
+    def export_to_dataframe(self):
+        """Export all complaints to pandas DataFrame"""
+        import pandas as pd
+        complaints = self.get_all_complaints(limit=10000)
+        
+        data = []
+        for c in complaints:
+            data.append({
+                'ID': c.id,
+                'Location': c.location,
+                'Latitude': c.latitude,
+                'Longitude': c.longitude,
+                'Tags': c.tags,
+                'Description': c.description,
+                'Status': c.status,
+                'Created At': c.created_at,
+                'Resolved At': c.resolved_at,
+                'Resolution Time (hours)': c.resolution_time_hours
+            })
+        
+        return pd.DataFrame(data)
+    
+    def extract_gps_from_image(self, uploaded_file):
+        """Extract GPS coordinates from image"""
+        return self.storage.extract_gps_from_image(uploaded_file)

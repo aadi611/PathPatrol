@@ -9,7 +9,7 @@ from typing import Optional, List
 class Complaint:
     """Complaint data model"""
     id: Optional[int] = None
-    photo_path: str = ""
+    photo_path: str = ""  # Can be multiple paths separated by semicolon
     location: str = ""
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -17,6 +17,8 @@ class Complaint:
     description: str = ""
     created_at: Optional[datetime] = None
     status: str = "pending"  # pending, in_progress, resolved
+    resolved_at: Optional[datetime] = None
+    resolution_time_hours: Optional[float] = None
     
     def get_tags_list(self) -> List[str]:
         """Convert tags string to list"""
@@ -25,6 +27,14 @@ class Complaint:
     def set_tags_list(self, tags_list: List[str]):
         """Convert tags list to string"""
         self.tags = ', '.join(tags_list)
+    
+    def get_photo_paths(self) -> List[str]:
+        """Convert photo_path string to list of paths"""
+        return [path.strip() for path in self.photo_path.split(';') if path.strip()]
+    
+    def set_photo_paths(self, paths_list: List[str]):
+        """Convert photo paths list to string"""
+        self.photo_path = ';'.join(paths_list)
     
     def to_dict(self):
         """Convert to dictionary"""
@@ -37,5 +47,7 @@ class Complaint:
             'tags': self.tags,
             'description': self.description,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'status': self.status
+            'status': self.status,
+            'resolved_at': self.resolved_at.isoformat() if self.resolved_at else None,
+            'resolution_time_hours': self.resolution_time_hours
         }

@@ -37,7 +37,9 @@ class DatabaseManager:
                     tags TEXT,
                     description TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    status TEXT DEFAULT 'pending'
+                    status TEXT DEFAULT 'pending',
+                    resolved_at TIMESTAMP,
+                    resolution_time_hours REAL
                 )
             """)
             conn.commit()
@@ -103,11 +105,25 @@ class DatabaseManager:
         """Update complaint status"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE complaints 
-                SET status = ?
-                WHERE id = ?
-            """, (status, complaint_id))
+            
+            # If marking as resolved, update resolved_at and calculate resolution time
+            if status == 'resolved':
+                cursor.execute("""
+                    UPDATE complaints 
+                    SET status = ?,
+                        resolved_at = CURRENT_TIMESTAMP,
+                        resolution_time_hours = (
+                            (julianday(CURRENT_TIMESTAMP) - julianday(created_at)) * 24
+                        )
+                    WHERE id = ?
+                """, (status, complaint_id))
+            else:
+                cursor.execute("""
+                    UPDATE complaints 
+                    SET status = ?
+                    WHERE id = ?
+                """, (status, complaint_id))
+            
             conn.commit()
             return cursor.rowcount > 0
     
@@ -136,10 +152,65 @@ class DatabaseManager:
             """)
             by_status = {row['status']: row['count'] for row in cursor.fetchall()}
             
+            # Average resolution time
+            cursor.execute("""
+                SELECT AVG(resolution_time_hours) as avg_resolution_time
+                FROM complaints
+                WHERE status = 'resolved' AND resolution_time_hours IS NOT NULL
+            """)
+            avg_resolution = cursor.fetchone()['avg_resolution_time']
+            
+            # By tag
+            cursor.execute("SELECT tags FROM complaints WHERE tags != ''")
+            all_tags = {}
+            for row in cursor.fetchall():
+                tags = [t.strip() for t in row['tags'].split(',') if t.strip()]
+                for tag in tags:
+                    all_tags[tag] = all_tags.get(tag, 0) + 1
+            
+            # Complaints over time (last 30 days)
+            cursor.execute("""
+                SELECT DATE(created_at) as date, COUNT(*) as count
+                FROM complaints
+                WHERE created_at >= datetime('now', '-30 days')
+                GROUP BY DATE(created_at)
+                ORDER BY date
+            """)
+            timeline = [dict(row) for row in cursor.fetchall()]
+            
             return {
                 'total': total,
-                'by_status': by_status
+                'by_status': by_status,
+                'avg_resolution_hours': avg_resolution,
+                'by_tag': all_tags,
+                'timeline': timeline
             }
+    
+    def search_complaints(self, search_term: str) -> List[Complaint]:
+        """Search complaints by location or description"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM complaints 
+                WHERE location LIKE ? OR description LIKE ?
+                ORDER BY created_at DESC
+            """, (f'%{search_term}%', f'%{search_term}%'))
+            
+            rows = cursor.fetchall()
+            return [self._row_to_complaint(row) for row in rows]
+    
+    def filter_by_date_range(self, start_date: str, end_date: str) -> List[Complaint]:
+        """Filter complaints by date range"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM complaints 
+                WHERE DATE(created_at) BETWEEN ? AND ?
+                ORDER BY created_at DESC
+            """, (start_date, end_date))
+            
+            rows = cursor.fetchall()
+            return [self._row_to_complaint(row) for row in rows]
     
     def _row_to_complaint(self, row: sqlite3.Row) -> Complaint:
         """Convert database row to Complaint object"""
@@ -152,5 +223,7 @@ class DatabaseManager:
             tags=row['tags'],
             description=row['description'],
             created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
-            status=row['status']
+            status=row['status'],
+            resolved_at=datetime.fromisoformat(row['resolved_at']) if row.get('resolved_at') else None,
+            resolution_time_hours=row.get('resolution_time_hours')
         )

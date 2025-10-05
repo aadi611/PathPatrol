@@ -5,8 +5,9 @@ import os
 import hashlib
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Tuple
 from PIL import Image
+from PIL.ExifTags import TAGS, GPSTAGS
 from config.settings import UPLOAD_DIR, ALLOWED_EXTENSIONS, MAX_FILE_SIZE_MB
 
 
@@ -109,3 +110,60 @@ class StorageService:
             image.thumbnail(max_size, Image.Resampling.LANCZOS)
         
         return image
+    
+    def extract_gps_from_image(self, uploaded_file) -> Optional[Tuple[float, float]]:
+        """
+        Extract GPS coordinates from image EXIF data
+        
+        Returns:
+            Tuple of (latitude, longitude) or None if not found
+        """
+        try:
+            image = Image.open(uploaded_file)
+            uploaded_file.seek(0)  # Reset file pointer
+            
+            exifdata = image.getexif()
+            if not exifdata:
+                return None
+            
+            # Get GPS info
+            gps_info = {}
+            for tag_id, value in exifdata.items():
+                tag = TAGS.get(tag_id, tag_id)
+                if tag == 'GPSInfo':
+                    for gps_tag in value:
+                        gps_tag_name = GPSTAGS.get(gps_tag, gps_tag)
+                        gps_info[gps_tag_name] = value[gps_tag]
+            
+            if not gps_info:
+                return None
+            
+            # Extract latitude and longitude
+            lat = self._convert_to_degrees(gps_info.get('GPSLatitude'))
+            lon = self._convert_to_degrees(gps_info.get('GPSLongitude'))
+            
+            if lat is None or lon is None:
+                return None
+            
+            # Check for South/West and make negative
+            if gps_info.get('GPSLatitudeRef') == 'S':
+                lat = -lat
+            if gps_info.get('GPSLongitudeRef') == 'W':
+                lon = -lon
+            
+            return (lat, lon)
+            
+        except Exception as e:
+            print(f"Error extracting GPS data: {e}")
+            return None
+    
+    def _convert_to_degrees(self, value):
+        """Convert GPS coordinates to degrees"""
+        if not value:
+            return None
+        
+        try:
+            d, m, s = value
+            return float(d) + float(m) / 60.0 + float(s) / 3600.0
+        except:
+            return None
