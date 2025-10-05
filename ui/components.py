@@ -26,6 +26,8 @@ def render_complaint_form(on_submit_callback):
     Args:
         on_submit_callback: Function to call on form submission
     """
+    from utils.location_utils import location_service
+    
     st.subheader("📝 Submit New Complaint")
     
     with st.form("complaint_form", clear_on_submit=True):
@@ -40,24 +42,71 @@ def render_complaint_form(on_submit_callback):
         # Auto GPS extraction option
         auto_gps = st.checkbox("🔍 Auto-extract GPS from first photo", value=True)
         
-        # Location
-        col1, col2 = st.columns(2)
-        with col1:
-            location = st.text_input(
-                "Location/Address *",
-                placeholder="e.g., Main Street near City Hall"
-            )
+        st.markdown("---")
+        st.markdown("### 📍 Location Information")
         
-        with col2:
-            # Optional coordinates
-            use_coords = st.checkbox("Add/Override GPS coordinates")
+        # Location search input
+        location_search = st.text_input(
+            "Search Location *",
+            placeholder="Type city, street, or address... (e.g., 'Times Square, New York' or 'Tokyo, Japan')",
+            help="Start typing to search for locations worldwide",
+            key="location_search"
+        )
         
-        latitude = None
-        longitude = None
-        if use_coords:
+        # Search and display results
+        selected_location = None
+        selected_coords = None
+        
+        if location_search and len(location_search) >= 3:
+            with st.spinner("🔍 Searching locations..."):
+                results = location_service.search_locations(location_search, limit=10)
+            
+            if results:
+                st.markdown("**Select from results:**")
+                
+                # Create radio options from results
+                location_options = [
+                    f"{idx+1}. {result['display_name'][:100]}" 
+                    for idx, result in enumerate(results)
+                ]
+                
+                selected_idx = st.radio(
+                    "Choose location:",
+                    range(len(location_options)),
+                    format_func=lambda x: location_options[x],
+                    key="location_select"
+                )
+                
+                if selected_idx is not None:
+                    selected_location = results[selected_idx]['display_name']
+                    selected_coords = (
+                        results[selected_idx]['latitude'],
+                        results[selected_idx]['longitude']
+                    )
+                    
+                    # Display selected coordinates
+                    st.success(f"✅ Selected: {selected_location}")
+                    st.info(f"📍 Coordinates: {selected_coords[0]:.6f}, {selected_coords[1]:.6f}")
+            else:
+                st.warning("No locations found. Try a different search term or enter manually below.")
+        
+        # Manual location entry (fallback)
+        st.markdown("**Or enter location manually:**")
+        manual_location = st.text_input(
+            "Manual Location Entry",
+            placeholder="e.g., Main Street near City Hall",
+            help="Use this if search doesn't find your location"
+        )
+        
+        # Manual coordinates override
+        use_manual_coords = st.checkbox("Override with manual GPS coordinates")
+        
+        manual_latitude = None
+        manual_longitude = None
+        if use_manual_coords:
             coord_col1, coord_col2 = st.columns(2)
             with coord_col1:
-                latitude = st.number_input(
+                manual_latitude = st.number_input(
                     "Latitude",
                     min_value=-90.0,
                     max_value=90.0,
@@ -65,13 +114,15 @@ def render_complaint_form(on_submit_callback):
                     format="%.6f"
                 )
             with coord_col2:
-                longitude = st.number_input(
+                manual_longitude = st.number_input(
                     "Longitude",
                     min_value=-180.0,
                     max_value=180.0,
                     value=0.0,
                     format="%.6f"
                 )
+        
+        st.markdown("---")
         
         # Tags
         tags = st.multiselect(
@@ -96,28 +147,37 @@ def render_complaint_form(on_submit_callback):
                 st.error("⚠️ Please upload at least one photo")
                 return
             
-            if not location:
-                st.error("⚠️ Please enter a location")
+            # Determine final location
+            final_location = None
+            if selected_location:
+                final_location = selected_location
+            elif manual_location:
+                final_location = manual_location
+            
+            if not final_location:
+                st.error("⚠️ Please select a location from search or enter manually")
                 return
             
-            # Auto-extract GPS if enabled and not manually set
-            extracted_lat, extracted_lon = None, None
-            if auto_gps and not use_coords and uploaded_files:
+            # Determine final coordinates
+            final_lat, final_lon = None, None
+            
+            # Priority: Manual coords > Selected coords > Auto-extracted GPS
+            if use_manual_coords:
+                final_lat, final_lon = manual_latitude, manual_longitude
+            elif selected_coords:
+                final_lat, final_lon = selected_coords
+            elif auto_gps and uploaded_files:
                 from services import ComplaintService
                 service = ComplaintService()
                 gps_coords = service.extract_gps_from_image(uploaded_files[0])
                 if gps_coords:
-                    extracted_lat, extracted_lon = gps_coords
-                    st.success(f"📍 GPS extracted: {extracted_lat:.6f}, {extracted_lon:.6f}")
-            
-            # Use manual coords if provided, otherwise use extracted
-            final_lat = latitude if use_coords else extracted_lat
-            final_lon = longitude if use_coords else extracted_lon
+                    final_lat, final_lon = gps_coords
+                    st.success(f"📍 GPS extracted from photo: {final_lat:.6f}, {final_lon:.6f}")
             
             # Call the callback
             on_submit_callback(
                 uploaded_files=uploaded_files,
-                location=location,
+                location=final_location,
                 latitude=final_lat,
                 longitude=final_lon,
                 tags=tags,

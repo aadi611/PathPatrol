@@ -8,6 +8,7 @@ from .chart_utils import (
     create_timeline_chart,
     create_resolution_time_chart
 )
+from .location_utils import location_service, LocationService
 
 __all__ = [
     'create_complaints_map',
@@ -15,6 +16,8 @@ __all__ = [
     'create_status_pie_chart',
     'create_tag_bar_chart',
     'create_timeline_chart',
-    'create_resolution_time_chart'
+    'create_resolution_time_chart',
+    'location_service',
+    'LocationService'
 ]
 
