@@ -2,22 +2,26 @@
 
 A modern, minimal web application for reporting potholes with photo upload, location tracking, and tagging capabilities.
 
-## Features
+## ✨ Features
 
-- 📸 Photo upload with camera support
-- 📍 Location tracking (manual entry)
-- 🏷️ Tag-based categorization
-- 🌓 Light/Dark theme toggle
-- 💾 Local SQLite database
-- 📱 Responsive design
-- 🎨 Modern UI with blue color scheme
+- 📸 **Photo Upload**: Capture and upload pothole images
+- 📍 **Location Tracking**: Manual address entry with optional GPS coordinates
+- 🏷️ **Smart Tagging**: Categorize by severity, location type, and urgency
+- 🌓 **Dual Themes**: Modern light and dark themes (white/blue & navy/blue)
+- 💾 **Local Storage**: SQLite database with local file system
+- � **Statistics Dashboard**: Real-time analytics and complaint tracking
+- �📱 **Responsive Design**: Works seamlessly on all devices
+- 🎨 **Modern UI**: Clean, symmetric, minimal interface
 
-## Tech Stack
+## 🛠️ Technology Stack
 
-- **Frontend**: Streamlit with custom CSS
-- **Backend**: Modular Python architecture
-- **Database**: SQLite (local storage)
-- **Image Storage**: Local file system
+| Layer | Technology |
+|-------|------------|
+| Frontend | Streamlit + Custom CSS/HTML |
+| Backend | Modular Python Framework |
+| Database | SQLite (Local Storage) |
+| Image Processing | Pillow (PIL) |
+| Data Handling | Pandas |
 
 ## Project Structure
 
@@ -46,29 +50,153 @@ govt_assist_road/
 └── requirements.txt
 ```
 
-## Installation
+## 🚀 Quick Start
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Option 1: PowerShell Script (Recommended)
+```powershell
+.\run.ps1
+```
 
-3. Run the application:
-   ```bash
-   streamlit run app.py
-   ```
+### Option 2: Batch File
+```cmd
+run.bat
+```
 
-## Usage
+### Option 3: Manual Setup
+```powershell
+# Create virtual environment
+python -m venv venv
 
-1. Open the application in your browser
-2. Toggle between Light/Dark theme
-3. Upload a pothole photo
-4. Enter location details
-5. Add relevant tags
-6. Submit the complaint
-7. View all complaints in the gallery
+# Activate (PowerShell)
+.\venv\Scripts\Activate.ps1
 
-## License
+# Activate (CMD)
+venv\Scripts\activate.bat
 
-MIT License
+# Install dependencies
+pip install -r requirements.txt
+
+# Run application
+streamlit run app.py
+```
+
+The app will open automatically at `http://localhost:8501`
+
+## 📖 Documentation
+
+- **[SETUP.md](SETUP.md)** - Detailed setup instructions
+- **[QUICKSTART.md](QUICKSTART.md)** - Feature guide and usage
+
+## 🎯 Use Cases
+
+- **Citizens**: Report potholes in your neighborhood
+- **Municipal Teams**: Track and manage road repairs
+- **Community Groups**: Organize road safety initiatives
+- **Infrastructure Planning**: Data-driven maintenance decisions
+
+## 🏗️ Architecture
+
+**Modular Python Framework** with clean separation of concerns:
+
+- **Config Layer**: Centralized settings and theme management
+- **Database Layer**: SQLite with clean data models
+- **Service Layer**: Business logic and file storage
+- **UI Layer**: Reusable components with modern CSS
+- **Utils Layer**: Shared utilities and helpers
+
+**Scalable & Maintainable** - Easy to extend with new features
+
+## 🎨 Themes
+
+### Light Theme
+- Clean white background
+- Professional blue accents (#2E86DE, #54A0FF)
+- High contrast for readability
+
+### Dark Theme
+- Navy background (#0F172A)
+- Elegant blue highlights (#3B82F6, #60A5FA)
+- Comfortable for extended use
+
+## 🛠️ Technology Stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | Streamlit + Custom CSS/HTML |
+| Backend | Modular Python Framework |
+| Database | SQLite (Local Storage) |
+| Image Processing | Pillow (PIL) |
+| Data Handling | Pandas |
+
+## 📦 Requirements
+
+- Python 3.8+
+- streamlit==1.28.0
+- Pillow==10.1.0
+- pandas==2.1.1
+
+## 🔧 Configuration
+
+Customize the app by editing `config/settings.py`:
+
+```python
+# Theme colors
+THEMES = {
+    "light": {...},
+    "dark": {...}
+}
+
+# Default tags
+DEFAULT_TAGS = [
+    "Severe", "Moderate", "Minor",
+    "Highway", "Residential", "Commercial",
+    "Urgent", "Maintenance", "Safety Hazard"
+]
+
+# Upload settings
+MAX_FILE_SIZE_MB = 10
+ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+```
+
+## 📊 Database Schema
+
+```sql
+CREATE TABLE complaints (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    photo_path TEXT NOT NULL,
+    location TEXT NOT NULL,
+    latitude REAL,
+    longitude REAL,
+    tags TEXT,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status TEXT DEFAULT 'pending'
+)
+```
+
+## 🚀 Roadmap
+
+- [ ] User authentication and profiles
+- [ ] Email notifications for status updates
+- [ ] Map view with geolocation clustering
+- [ ] Export reports (PDF, Excel)
+- [ ] Mobile app (React Native)
+- [ ] Admin dashboard
+- [ ] API for third-party integrations
+- [ ] Multi-language support
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit issues or pull requests.
+
+## 📄 License
+
+This project is open source and available under the MIT License.
+
+## 🙏 Acknowledgments
+
+Built with ❤️ for safer roads and better communities.
+
+---
+
+**PathPatrol** - *Empowering citizens, improving infrastructure*
