@@ -2,9 +2,11 @@
 UI components for the application
 """
 import streamlit as st
-from datetime import datetime
+import pandas as pd
+from datetime import datetime, date
 from database.models import Complaint
 from config.settings import DEFAULT_TAGS, APP_TITLE, APP_ICON
+from io import BytesIO
 
 
 def render_header():
@@ -27,12 +29,16 @@ def render_complaint_form(on_submit_callback):
     st.subheader("📝 Submit New Complaint")
     
     with st.form("complaint_form", clear_on_submit=True):
-        # Photo upload
-        uploaded_file = st.file_uploader(
-            "Upload Pothole Photo *",
+        # Photo upload - Multiple files
+        uploaded_files = st.file_uploader(
+            "Upload Pothole Photo(s) * (Multiple images allowed)",
             type=['jpg', 'jpeg', 'png', 'gif', 'webp'],
-            help="Upload a clear photo of the pothole"
+            accept_multiple_files=True,
+            help="Upload clear photos of the pothole"
         )
+        
+        # Auto GPS extraction option
+        auto_gps = st.checkbox("🔍 Auto-extract GPS from first photo", value=True)
         
         # Location
         col1, col2 = st.columns(2)
@@ -44,7 +50,7 @@ def render_complaint_form(on_submit_callback):
         
         with col2:
             # Optional coordinates
-            use_coords = st.checkbox("Add GPS coordinates")
+            use_coords = st.checkbox("Add/Override GPS coordinates")
         
         latitude = None
         longitude = None
@@ -86,20 +92,34 @@ def render_complaint_form(on_submit_callback):
         
         if submitted:
             # Validation
-            if not uploaded_file:
-                st.error("⚠️ Please upload a photo")
+            if not uploaded_files:
+                st.error("⚠️ Please upload at least one photo")
                 return
             
             if not location:
                 st.error("⚠️ Please enter a location")
                 return
             
+            # Auto-extract GPS if enabled and not manually set
+            extracted_lat, extracted_lon = None, None
+            if auto_gps and not use_coords and uploaded_files:
+                from services import ComplaintService
+                service = ComplaintService()
+                gps_coords = service.extract_gps_from_image(uploaded_files[0])
+                if gps_coords:
+                    extracted_lat, extracted_lon = gps_coords
+                    st.success(f"📍 GPS extracted: {extracted_lat:.6f}, {extracted_lon:.6f}")
+            
+            # Use manual coords if provided, otherwise use extracted
+            final_lat = latitude if use_coords else extracted_lat
+            final_lon = longitude if use_coords else extracted_lon
+            
             # Call the callback
             on_submit_callback(
-                uploaded_file=uploaded_file,
+                uploaded_files=uploaded_files,
                 location=location,
-                latitude=latitude if use_coords else None,
-                longitude=longitude if use_coords else None,
+                latitude=final_lat,
+                longitude=final_lon,
                 tags=tags,
                 description=description
             )
@@ -133,6 +153,12 @@ def render_complaint_card(complaint: Complaint, show_image: bool = True):
     if complaint.latitude and complaint.longitude:
         location_info += f" ({complaint.latitude:.4f}, {complaint.longitude:.4f})"
     
+    # Resolution time
+    resolution_html = ""
+    if complaint.resolved_at and complaint.resolution_time_hours:
+        days = complaint.resolution_time_hours / 24
+        resolution_html = f'<p><strong>⏱️ Resolution Time:</strong> {days:.1f} days</p>'
+    
     st.markdown(f"""
         <div class="complaint-card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -141,16 +167,27 @@ def render_complaint_card(complaint: Complaint, show_image: bool = True):
             </div>
     """, unsafe_allow_html=True)
     
-    # Show image if requested
+    # Show images if requested
     if show_image:
         try:
             from services import ComplaintService
             service = ComplaintService()
-            image_path = service.get_image_path(complaint.photo_path)
-            if image_path.exists():
-                st.image(str(image_path), use_container_width=True)
+            photo_paths = complaint.get_photo_paths()
+            
+            # Display images in columns if multiple
+            if len(photo_paths) > 1:
+                cols = st.columns(min(len(photo_paths), 3))
+                for idx, photo_path in enumerate(photo_paths[:6]):  # Max 6 images
+                    image_path = service.get_image_path(photo_path)
+                    if image_path.exists():
+                        with cols[idx % 3]:
+                            st.image(str(image_path), use_container_width=True)
+            elif len(photo_paths) == 1:
+                image_path = service.get_image_path(photo_paths[0])
+                if image_path.exists():
+                    st.image(str(image_path), use_container_width=True)
         except Exception as e:
-            st.warning(f"Could not load image: {e}")
+            st.warning(f"Could not load images: {e}")
     
     st.markdown(f"""
             <div style="margin-top: 1rem;">
@@ -158,6 +195,7 @@ def render_complaint_card(complaint: Complaint, show_image: bool = True):
                 <p><strong>📅 Reported:</strong> {date_str}</p>
                 {f'<p><strong>🏷️ Tags:</strong> {tags_html}</p>' if tags_html else ''}
                 {f'<p><strong>📝 Description:</strong> {complaint.description}</p>' if complaint.description else ''}
+                {resolution_html}
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -165,13 +203,22 @@ def render_complaint_card(complaint: Complaint, show_image: bool = True):
 
 def render_statistics(stats: dict):
     """
-    Render statistics dashboard
+    Render statistics dashboard with charts
     
     Args:
         stats: Statistics dictionary
     """
-    st.subheader("📊 Statistics")
+    import plotly.graph_objects as go
+    from utils.chart_utils import (
+        create_status_pie_chart,
+        create_tag_bar_chart,
+        create_timeline_chart,
+        create_resolution_time_chart
+    )
     
+    st.subheader("📊 Statistics Overview")
+    
+    # Top metrics
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -208,6 +255,35 @@ def render_statistics(stats: dict):
                 <div class="stat-label">Resolved</div>
             </div>
         """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Charts in two columns
+    chart_col1, chart_col2 = st.columns(2)
+    
+    with chart_col1:
+        # Status pie chart
+        pie_chart = create_status_pie_chart(stats)
+        if pie_chart:
+            st.plotly_chart(pie_chart, use_container_width=True)
+        
+        # Timeline chart
+        timeline_chart = create_timeline_chart(stats)
+        if timeline_chart:
+            st.plotly_chart(timeline_chart, use_container_width=True)
+    
+    with chart_col2:
+        # Tag bar chart
+        tag_chart = create_tag_bar_chart(stats)
+        if tag_chart:
+            st.plotly_chart(tag_chart, use_container_width=True)
+        
+        # Resolution time gauge
+        resolution_chart = create_resolution_time_chart(stats)
+        if resolution_chart:
+            st.plotly_chart(resolution_chart, use_container_width=True)
+        else:
+            st.info("⏱️ No resolved complaints yet to show average resolution time")
 
 
 def render_theme_toggle():
@@ -217,3 +293,74 @@ def render_theme_toggle():
     
     # Always use dark mode
     st.session_state.theme = 'dark'
+
+
+def render_search_and_filters():
+    """Render advanced search and filtering options"""
+    st.subheader("🔍 Search & Filters")
+    
+    # Search bar
+    search_term = st.text_input(
+        "Search",
+        placeholder="Search by location or description...",
+        key="search_input"
+    )
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Date range filter
+        use_date_filter = st.checkbox("Filter by date range")
+        if use_date_filter:
+            start_date = st.date_input("Start date", value=date.today())
+            end_date = st.date_input("End date", value=date.today())
+            st.session_state.date_range = (start_date, end_date)
+        else:
+            st.session_state.date_range = None
+    
+    with col2:
+        # Sort options
+        sort_by = st.selectbox(
+            "Sort by",
+            options=["Newest First", "Oldest First", "Status"]
+        )
+        st.session_state.sort_by = sort_by
+    
+    return search_term
+
+
+def render_export_button(service):
+    """Render export to CSV/Excel button"""
+    col1, col2 = st.columns([1, 5])
+    
+    with col1:
+        if st.button("📥 Export Data", use_container_width=True):
+            try:
+                df = service.export_to_dataframe()
+                
+                # Convert to Excel
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df.to_excel(writer, index=False, sheet_name='Complaints')
+                
+                output.seek(0)
+                
+                st.download_button(
+                    label="📥 Download Excel",
+                    data=output,
+                    file_name=f"pathpatrol_complaints_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+                
+                # Also provide CSV option
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    label="📥 Download CSV",
+                    data=csv,
+                    file_name=f"pathpatrol_complaints_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.error(f"Export failed: {e}")

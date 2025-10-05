@@ -1,9 +1,10 @@
 """
-Pothole Complaint Portal - Main Application
+PathPatrol - Pothole Complaint Portal
 A modern web application for reporting potholes with photo upload and location tracking
 """
 import streamlit as st
 from pathlib import Path
+from datetime import datetime
 import sys
 
 # Add project root to path
@@ -18,7 +19,9 @@ from ui.components import (
     render_complaint_form, 
     render_complaint_card,
     render_statistics,
-    render_theme_toggle
+    render_theme_toggle,
+    render_search_and_filters,
+    render_export_button
 )
 
 
@@ -41,15 +44,24 @@ def init_app():
     
     if 'filter_tag' not in st.session_state:
         st.session_state.filter_tag = None
+    
+    if 'search_term' not in st.session_state:
+        st.session_state.search_term = ""
+    
+    if 'date_range' not in st.session_state:
+        st.session_state.date_range = None
+    
+    if 'sort_by' not in st.session_state:
+        st.session_state.sort_by = "Newest First"
 
 
-def handle_complaint_submission(uploaded_file, location, latitude, longitude, tags, description):
+def handle_complaint_submission(uploaded_files, location, latitude, longitude, tags, description):
     """Handle complaint form submission"""
     service = ComplaintService()
     
     with st.spinner("Submitting your complaint..."):
         complaint_id = service.submit_complaint(
-            uploaded_file=uploaded_file,
+            uploaded_files=uploaded_files,
             location=location,
             latitude=latitude,
             longitude=longitude,
@@ -71,7 +83,7 @@ def render_sidebar():
         st.title("📋 Navigation")
         page = st.radio(
             "Go to",
-            ["Submit Complaint", "View Complaints", "Statistics"],
+            ["Submit Complaint", "View Complaints", "Map View", "Statistics"],
             label_visibility="collapsed"
         )
         
@@ -100,15 +112,16 @@ def render_sidebar():
         
         # About
         st.markdown("""
-        ### About
-        This portal helps citizens report potholes and track their resolution.
+        ### About PathPatrol
+        Report potholes and help improve our roads.
         
         **Features:**
-        - 📸 Photo upload
-        - 📍 Location tracking
-        - 🏷️ Tag system
-        - 📊 Statistics
-        - � Dark theme
+        - 📸 Multiple photo upload
+        - 📍 Auto GPS extraction
+        - 🗺️ Interactive maps
+        - 🔍 Advanced filtering
+        - 📊 Analytics & charts
+        - 📥 Export to Excel/CSV
         """)
         
         return page
@@ -125,8 +138,24 @@ def render_view_page():
     
     service = ComplaintService()
     
-    # Get complaints
-    if st.session_state.filter_tag:
+    # Export button
+    render_export_button(service)
+    
+    # Search and filters
+    search_term = render_search_and_filters()
+    
+    # Get complaints based on filters
+    complaints = []
+    
+    if search_term:
+        complaints = service.search_complaints(search_term)
+    elif st.session_state.date_range:
+        start_date, end_date = st.session_state.date_range
+        complaints = service.filter_by_date_range(
+            start_date.strftime('%Y-%m-%d'),
+            end_date.strftime('%Y-%m-%d')
+        )
+    elif st.session_state.filter_tag:
         complaints = service.filter_by_tag(st.session_state.filter_tag)
     else:
         complaints = service.get_all_complaints(limit=50)
@@ -134,6 +163,14 @@ def render_view_page():
     # Apply status filter if set
     if hasattr(st.session_state, 'status_filter') and st.session_state.status_filter:
         complaints = [c for c in complaints if c.status == st.session_state.status_filter]
+    
+    # Sort complaints
+    if st.session_state.sort_by == "Newest First":
+        complaints.sort(key=lambda x: x.created_at if x.created_at else datetime.min, reverse=True)
+    elif st.session_state.sort_by == "Oldest First":
+        complaints.sort(key=lambda x: x.created_at if x.created_at else datetime.min)
+    elif st.session_state.sort_by == "Status":
+        complaints.sort(key=lambda x: x.status)
     
     if not complaints:
         st.info("No complaints found. Be the first to report a pothole!")
@@ -186,6 +223,50 @@ def render_stats_page():
         st.info("No complaints yet")
 
 
+def render_map_page():
+    """Render the interactive map page"""
+    from streamlit_folium import st_folium
+    from utils.map_utils import create_complaints_map, create_heatmap
+    
+    st.subheader("🗺️ Complaint Map")
+    
+    service = ComplaintService()
+    
+    # Map type selector
+    map_type = st.radio(
+        "Map Type",
+        ["Markers", "Heatmap"],
+        horizontal=True
+    )
+    
+    # Get all complaints with coordinates
+    all_complaints = service.get_all_complaints(limit=1000)
+    complaints_with_coords = [c for c in all_complaints if c.latitude and c.longitude]
+    
+    if not complaints_with_coords:
+        st.warning("⚠️ No complaints with GPS coordinates found. Upload photos with GPS data or add coordinates manually!")
+        return
+    
+    st.info(f"📍 Showing {len(complaints_with_coords)} complaints with GPS coordinates")
+    
+    # Create and display map
+    if map_type == "Markers":
+        m = create_complaints_map(complaints_with_coords)
+    else:
+        m = create_heatmap(complaints_with_coords)
+    
+    if m:
+        st_folium(m, width=1200, height=600)
+    
+    # Show legend
+    st.markdown("""
+    <div style='background: #1E293B; padding: 1rem; border-radius: 8px; margin-top: 1rem;'>
+        <strong>Legend:</strong><br>
+        🔴 Red - Pending | 🔵 Blue - In Progress | 🟢 Green - Resolved
+    </div>
+    """, unsafe_allow_html=True)
+
+
 def main():
     """Main application entry point"""
     # Initialize
@@ -205,6 +286,8 @@ def main():
         render_submit_page()
     elif page == "View Complaints":
         render_view_page()
+    elif page == "Map View":
+        render_map_page()
     elif page == "Statistics":
         render_stats_page()
 
