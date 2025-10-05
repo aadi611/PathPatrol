@@ -21,18 +21,8 @@ APP_TITLE = "Pothole Complaint Portal"
 APP_ICON = "🚧"
 PAGE_LAYOUT = "wide"
 
-# Theme colors
+# Theme colors - Dark mode only
 THEMES = {
-    "light": {
-        "primary": "#2E86DE",
-        "secondary": "#54A0FF",
-        "background": "#FFFFFF",
-        "surface": "#F8F9FA",
-        "text": "#2C3E50",
-        "text_secondary": "#7F8C8D",
-        "border": "#E1E8ED",
-        "accent": "#3498DB"
-    },
     "dark": {
         "primary": "#1E3A8A",
         "secondary": "#3B82F6",

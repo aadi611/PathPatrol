@@ -269,7 +269,8 @@ def get_custom_css(theme: str = "light") -> str:
     """
 
 
-def apply_theme(theme: str):
-    """Apply theme to Streamlit app"""
+def apply_theme(theme: str = "dark"):
+    """Apply dark theme to Streamlit app"""
     import streamlit as st
-    st.markdown(get_custom_css(theme), unsafe_allow_html=True)
+    # Always use dark theme
+    st.markdown(get_custom_css("dark"), unsafe_allow_html=True)

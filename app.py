@@ -37,7 +37,7 @@ def init_app():
     
     # Initialize session state
     if 'theme' not in st.session_state:
-        st.session_state.theme = 'light'
+        st.session_state.theme = 'dark'
     
     if 'filter_tag' not in st.session_state:
         st.session_state.filter_tag = None
@@ -67,13 +67,6 @@ def handle_complaint_submission(uploaded_file, location, latitude, longitude, ta
 def render_sidebar():
     """Render sidebar with filters and options"""
     with st.sidebar:
-        st.title("🎨 Settings")
-        
-        # Theme toggle
-        render_theme_toggle()
-        
-        st.divider()
-        
         # Navigation
         st.title("📋 Navigation")
         page = st.radio(
@@ -115,7 +108,7 @@ def render_sidebar():
         - 📍 Location tracking
         - 🏷️ Tag system
         - 📊 Statistics
-        - 🌓 Dark/Light theme
+        - � Dark theme
         """)
         
         return page
