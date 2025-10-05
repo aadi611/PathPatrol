@@ -42,6 +42,20 @@ class DatabaseManager:
                     resolution_time_hours REAL
                 )
             """)
+            
+            # Migration: Add new columns if they don't exist
+            try:
+                cursor.execute("ALTER TABLE complaints ADD COLUMN resolved_at TIMESTAMP")
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
+            
+            try:
+                cursor.execute("ALTER TABLE complaints ADD COLUMN resolution_time_hours REAL")
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
+            
             conn.commit()
     
     def create_complaint(self, complaint: Complaint) -> int:
@@ -214,6 +228,17 @@ class DatabaseManager:
     
     def _row_to_complaint(self, row: sqlite3.Row) -> Complaint:
         """Convert database row to Complaint object"""
+        # Check if columns exist in the row
+        try:
+            resolved_at = row['resolved_at']
+        except (KeyError, IndexError):
+            resolved_at = None
+        
+        try:
+            resolution_time_hours = row['resolution_time_hours']
+        except (KeyError, IndexError):
+            resolution_time_hours = None
+        
         return Complaint(
             id=row['id'],
             photo_path=row['photo_path'],
@@ -224,6 +249,6 @@ class DatabaseManager:
             description=row['description'],
             created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
             status=row['status'],
-            resolved_at=datetime.fromisoformat(row['resolved_at']) if row.get('resolved_at') else None,
-            resolution_time_hours=row.get('resolution_time_hours')
+            resolved_at=datetime.fromisoformat(resolved_at) if resolved_at else None,
+            resolution_time_hours=resolution_time_hours
         )

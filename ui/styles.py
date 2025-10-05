@@ -129,6 +129,34 @@ def get_custom_css(theme: str = "light") -> str:
         border-radius: 8px;
     }}
     
+    /* Selectbox (Dropdown) */
+    .stSelectbox > div > div {{
+        background-color: {colors['surface']};
+        border: 1px solid {colors['border']};
+        border-radius: 8px;
+    }}
+    
+    .stSelectbox > div > div:hover {{
+        border-color: {colors['primary']};
+    }}
+    
+    /* Metric cards */
+    div[data-testid="metric-container"] {{
+        background-color: {colors['surface']};
+        border: 1px solid {colors['border']};
+        padding: 1rem;
+        border-radius: 8px;
+    }}
+    
+    div[data-testid="metric-container"] label {{
+        color: {colors['text_secondary']};
+    }}
+    
+    div[data-testid="metric-container"] div {{
+        color: {colors['primary']};
+        font-weight: 600;
+    }}
+    
     /* Tags */
     .tag {{
         display: inline-block;

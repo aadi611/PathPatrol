@@ -45,10 +45,12 @@ def render_complaint_form(on_submit_callback):
         st.markdown("---")
         st.markdown("### 📍 Location Information")
         
+        st.info("💡 **Tip:** Search for your location worldwide - cities, streets, landmarks!")
+        
         # Location search input
         location_search = st.text_input(
-            "Search Location *",
-            placeholder="Type city, street, or address... (e.g., 'Times Square, New York' or 'Tokyo, Japan')",
+            "🔍 Search Location *",
+            placeholder="Type to search: 'New York', 'Tokyo', 'London', 'Paris'...",
             help="Start typing to search for locations worldwide",
             key="location_search"
         )
@@ -59,36 +61,41 @@ def render_complaint_form(on_submit_callback):
         
         if location_search and len(location_search) >= 3:
             with st.spinner("🔍 Searching locations..."):
-                results = location_service.search_locations(location_search, limit=10)
+                results = location_service.search_locations(location_search, limit=15)
             
             if results:
-                st.markdown("**Select from results:**")
-                
-                # Create radio options from results
-                location_options = [
-                    f"{idx+1}. {result['display_name'][:100]}" 
-                    for idx, result in enumerate(results)
+                # Create dropdown options
+                location_options = ["-- Select a location --"] + [
+                    result['display_name'] for result in results
                 ]
                 
-                selected_idx = st.radio(
-                    "Choose location:",
-                    range(len(location_options)),
-                    format_func=lambda x: location_options[x],
-                    key="location_select"
+                # Dropdown menu for selection
+                selected_option = st.selectbox(
+                    "📍 Select Location from Dropdown:",
+                    options=location_options,
+                    key="location_dropdown",
+                    help="Choose the exact location from the dropdown menu"
                 )
                 
-                if selected_idx is not None:
+                # Process selection
+                if selected_option and selected_option != "-- Select a location --":
+                    # Find the selected result
+                    selected_idx = location_options.index(selected_option) - 1
                     selected_location = results[selected_idx]['display_name']
                     selected_coords = (
                         results[selected_idx]['latitude'],
                         results[selected_idx]['longitude']
                     )
                     
-                    # Display selected coordinates
-                    st.success(f"✅ Selected: {selected_location}")
-                    st.info(f"📍 Coordinates: {selected_coords[0]:.6f}, {selected_coords[1]:.6f}")
+                    # Display selected details in a nice card
+                    st.success(f"✅ Selected Location")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("📍 Latitude", f"{selected_coords[0]:.6f}°")
+                    with col2:
+                        st.metric("📍 Longitude", f"{selected_coords[1]:.6f}°")
             else:
-                st.warning("No locations found. Try a different search term or enter manually below.")
+                st.warning("⚠️ No locations found. Try a different search term or enter manually below.")
         
         # Manual location entry (fallback)
         st.markdown("**Or enter location manually:**")
