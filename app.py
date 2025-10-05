@@ -232,22 +232,54 @@ def render_map_page():
     
     service = ComplaintService()
     
+    # Get all complaints
+    all_complaints = service.get_all_complaints(limit=1000)
+    
+    if not all_complaints:
+        st.info("📋 No complaints found yet. Submit your first complaint to see it on the map!")
+        return
+    
+    # Filter complaints with coordinates
+    complaints_with_coords = [c for c in all_complaints if c.latitude and c.longitude]
+    
+    # Show statistics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Complaints", len(all_complaints))
+    with col2:
+        st.metric("With GPS", len(complaints_with_coords))
+    with col3:
+        st.metric("Without GPS", len(all_complaints) - len(complaints_with_coords))
+    
+    if not complaints_with_coords:
+        st.warning("⚠️ No complaints with GPS coordinates found yet!")
+        st.info("""
+        **How to add GPS coordinates:**
+        
+        1. 🔍 **Use Location Search** (Recommended!)
+           - Type location in search box
+           - Select from dropdown
+           - GPS auto-fills
+        
+        2. 📸 **Upload Photos with GPS**
+           - Take photos with smartphone
+           - Ensure location services enabled
+           - GPS extracted automatically
+        
+        3. ✏️ **Enter Manually**
+           - Check "Override with manual GPS coordinates"
+           - Enter latitude and longitude
+        """)
+        return
+    
+    st.success(f"📍 Showing {len(complaints_with_coords)} complaints with GPS coordinates on map")
+    
     # Map type selector
     map_type = st.radio(
         "Map Type",
         ["Markers", "Heatmap"],
         horizontal=True
     )
-    
-    # Get all complaints with coordinates
-    all_complaints = service.get_all_complaints(limit=1000)
-    complaints_with_coords = [c for c in all_complaints if c.latitude and c.longitude]
-    
-    if not complaints_with_coords:
-        st.warning("⚠️ No complaints with GPS coordinates found. Upload photos with GPS data or add coordinates manually!")
-        return
-    
-    st.info(f"📍 Showing {len(complaints_with_coords)} complaints with GPS coordinates")
     
     # Create and display map
     if map_type == "Markers":

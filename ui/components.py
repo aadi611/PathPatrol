@@ -252,6 +252,7 @@ def render_complaint_card(complaint: Complaint, show_image: bool = True):
     if show_image:
         try:
             from services import ComplaintService
+            from pathlib import Path
             service = ComplaintService()
             photo_paths = complaint.get_photo_paths()
             
@@ -259,14 +260,35 @@ def render_complaint_card(complaint: Complaint, show_image: bool = True):
             if len(photo_paths) > 1:
                 cols = st.columns(min(len(photo_paths), 3))
                 for idx, photo_path in enumerate(photo_paths[:6]):  # Max 6 images
-                    image_path = service.get_image_path(photo_path)
-                    if image_path.exists():
-                        with cols[idx % 3]:
-                            st.image(str(image_path), use_column_width=True)
+                    try:
+                        image_path = service.get_image_path(photo_path)
+                        if image_path.exists():
+                            with cols[idx % 3]:
+                                st.image(str(image_path), use_column_width=True)
+                        else:
+                            # Try alternative path
+                            from config.settings import DATABASE_DIR
+                            alt_path = DATABASE_DIR / photo_path
+                            if alt_path.exists():
+                                with cols[idx % 3]:
+                                    st.image(str(alt_path), use_column_width=True)
+                    except Exception as e:
+                        st.caption(f"⚠️ Image {idx+1} not found")
             elif len(photo_paths) == 1:
-                image_path = service.get_image_path(photo_paths[0])
-                if image_path.exists():
-                    st.image(str(image_path), use_column_width=True)
+                try:
+                    image_path = service.get_image_path(photo_paths[0])
+                    if image_path.exists():
+                        st.image(str(image_path), use_column_width=True)
+                    else:
+                        # Try alternative path
+                        from config.settings import DATABASE_DIR
+                        alt_path = DATABASE_DIR / photo_paths[0]
+                        if alt_path.exists():
+                            st.image(str(alt_path), use_column_width=True)
+                        else:
+                            st.caption(f"⚠️ Image not found at: {photo_paths[0]}")
+                except Exception as e:
+                    st.caption(f"⚠️ Could not load image: {e}")
         except Exception as e:
             st.warning(f"Could not load images: {e}")
     
