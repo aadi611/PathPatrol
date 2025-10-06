@@ -21,7 +21,8 @@ class ComplaintService:
         latitude: Optional[float],
         longitude: Optional[float],
         tags: List[str],
-        description: str
+        description: str,
+        user_id: Optional[int] = None
     ) -> Optional[int]:
         """
         Submit a new complaint
@@ -52,7 +53,8 @@ class ComplaintService:
                 longitude=longitude,
                 tags=', '.join(tags),
                 description=description,
-                status='pending'
+                status='pending',
+                user_id=user_id
             )
             
             # Save to database
@@ -70,6 +72,10 @@ class ComplaintService:
     def get_complaint(self, complaint_id: int) -> Optional[Complaint]:
         """Get a specific complaint"""
         return self.db.get_complaint(complaint_id)
+    
+    def get_complaints_by_user(self, user_id: int) -> List[Complaint]:
+        """Get all complaints by a specific user"""
+        return self.db.get_complaints_by_user(user_id)
     
     def filter_by_tag(self, tag: str) -> List[Complaint]:
         """Filter complaints by tag"""

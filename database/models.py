@@ -19,6 +19,9 @@ class Complaint:
     status: str = "pending"  # pending, in_progress, resolved
     resolved_at: Optional[datetime] = None
     resolution_time_hours: Optional[float] = None
+    user_id: Optional[int] = None  # User who created the complaint
+    assigned_to: Optional[int] = None  # Admin/Moderator assigned to handle
+    updated_by: Optional[int] = None  # Last user who updated the complaint
     
     def get_tags_list(self) -> List[str]:
         """Convert tags string to list"""
@@ -49,5 +52,8 @@ class Complaint:
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'status': self.status,
             'resolved_at': self.resolved_at.isoformat() if self.resolved_at else None,
-            'resolution_time_hours': self.resolution_time_hours
+            'resolution_time_hours': self.resolution_time_hours,
+            'user_id': self.user_id,
+            'assigned_to': self.assigned_to,
+            'updated_by': self.updated_by
         }
