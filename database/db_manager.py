@@ -39,22 +39,28 @@ class DatabaseManager:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     status TEXT DEFAULT 'pending',
                     resolved_at TIMESTAMP,
-                    resolution_time_hours REAL
+                    resolution_time_hours REAL,
+                    user_id INTEGER,
+                    assigned_to INTEGER,
+                    updated_by INTEGER
                 )
             """)
             
             # Migration: Add new columns if they don't exist
-            try:
-                cursor.execute("ALTER TABLE complaints ADD COLUMN resolved_at TIMESTAMP")
-            except sqlite3.OperationalError:
-                # Column already exists
-                pass
+            migrations = [
+                "ALTER TABLE complaints ADD COLUMN resolved_at TIMESTAMP",
+                "ALTER TABLE complaints ADD COLUMN resolution_time_hours REAL",
+                "ALTER TABLE complaints ADD COLUMN user_id INTEGER",
+                "ALTER TABLE complaints ADD COLUMN assigned_to INTEGER",
+                "ALTER TABLE complaints ADD COLUMN updated_by INTEGER"
+            ]
             
-            try:
-                cursor.execute("ALTER TABLE complaints ADD COLUMN resolution_time_hours REAL")
-            except sqlite3.OperationalError:
-                # Column already exists
-                pass
+            for migration in migrations:
+                try:
+                    cursor.execute(migration)
+                except sqlite3.OperationalError:
+                    # Column already exists
+                    pass
             
             conn.commit()
     
@@ -64,8 +70,8 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO complaints 
-                (photo_path, location, latitude, longitude, tags, description, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (photo_path, location, latitude, longitude, tags, description, status, user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 complaint.photo_path,
                 complaint.location,
@@ -73,7 +79,8 @@ class DatabaseManager:
                 complaint.longitude,
                 complaint.tags,
                 complaint.description,
-                complaint.status
+                complaint.status,
+                complaint.user_id
             ))
             conn.commit()
             return cursor.lastrowid
@@ -148,6 +155,19 @@ class DatabaseManager:
             cursor.execute("DELETE FROM complaints WHERE id = ?", (complaint_id,))
             conn.commit()
             return cursor.rowcount > 0
+    
+    def get_complaints_by_status(self, status: str) -> List[Complaint]:
+        """Get complaints by status"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM complaints 
+                WHERE status = ?
+                ORDER BY created_at DESC
+            """, (status,))
+            
+            rows = cursor.fetchall()
+            return [self._row_to_complaint(row) for row in rows]
     
     def get_statistics(self) -> dict:
         """Get complaint statistics"""
@@ -228,16 +248,12 @@ class DatabaseManager:
     
     def _row_to_complaint(self, row: sqlite3.Row) -> Complaint:
         """Convert database row to Complaint object"""
-        # Check if columns exist in the row
-        try:
-            resolved_at = row['resolved_at']
-        except (KeyError, IndexError):
-            resolved_at = None
-        
-        try:
-            resolution_time_hours = row['resolution_time_hours']
-        except (KeyError, IndexError):
-            resolution_time_hours = None
+        # Helper function to safely get column value
+        def get_col(name, default=None):
+            try:
+                return row[name]
+            except (KeyError, IndexError):
+                return default
         
         return Complaint(
             id=row['id'],
@@ -246,9 +262,42 @@ class DatabaseManager:
             latitude=row['latitude'],
             longitude=row['longitude'],
             tags=row['tags'],
-            description=row['description'],
+            description=row['description'] if row['description'] else "",
             created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
             status=row['status'],
-            resolved_at=datetime.fromisoformat(resolved_at) if resolved_at else None,
-            resolution_time_hours=resolution_time_hours
+            resolved_at=datetime.fromisoformat(get_col('resolved_at')) if get_col('resolved_at') else None,
+            resolution_time_hours=get_col('resolution_time_hours'),
+            user_id=get_col('user_id'),
+            assigned_to=get_col('assigned_to'),
+            updated_by=get_col('updated_by')
         )
+    
+    def get_complaints_by_user(self, user_id: int) -> List[Complaint]:
+        """Get all complaints by a specific user"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM complaints 
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+            """, (user_id,))
+            
+            rows = cursor.fetchall()
+            return [self._row_to_complaint(row) for row in rows]
+    
+    def assign_complaint(self, complaint_id: int, assigned_to_id: int, updated_by_id: int) -> bool:
+        """Assign complaint to a moderator/admin"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE complaints 
+                    SET assigned_to = ?, updated_by = ?
+                    WHERE id = ?
+                """, (assigned_to_id, updated_by_id, complaint_id))
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"Error assigning complaint: {e}")
+            return False
+

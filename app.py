@@ -23,6 +23,16 @@ from ui.components import (
     render_search_and_filters,
     render_export_button
 )
+from ui.auth_components import (
+    render_login_page,
+    render_signup_page,
+    render_user_profile,
+    check_permission
+)
+from ui.admin_components import (
+    render_admin_dashboard,
+    render_moderator_panel
+)
 
 
 # Initialize application
@@ -53,11 +63,23 @@ def init_app():
     
     if 'sort_by' not in st.session_state:
         st.session_state.sort_by = "Newest First"
+    
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+    
+    if 'user' not in st.session_state:
+        st.session_state.user = None
+    
+    if 'show_signup' not in st.session_state:
+        st.session_state.show_signup = False
 
 
 def handle_complaint_submission(uploaded_files, location, latitude, longitude, tags, description):
     """Handle complaint form submission"""
     service = ComplaintService()
+    
+    # Get current user ID
+    user_id = st.session_state.user.id if st.session_state.user else None
     
     with st.spinner("Submitting your complaint..."):
         complaint_id = service.submit_complaint(
@@ -66,7 +88,8 @@ def handle_complaint_submission(uploaded_files, location, latitude, longitude, t
             latitude=latitude,
             longitude=longitude,
             tags=tags,
-            description=description
+            description=description,
+            user_id=user_id
         )
     
     if complaint_id:
@@ -81,9 +104,19 @@ def render_sidebar():
     with st.sidebar:
         # Navigation
         st.title("📋 Navigation")
+        
+        # Build navigation options based on user role
+        nav_options = ["Submit Complaint", "View Complaints", "Map View", "Statistics"]
+        
+        if st.session_state.user:
+            if st.session_state.user.is_admin():
+                nav_options.append("Admin Dashboard")
+            if st.session_state.user.can_access_admin_panel():
+                nav_options.append("Moderator Panel")
+        
         page = st.radio(
             "Go to",
-            ["Submit Complaint", "View Complaints", "Map View", "Statistics"],
+            nav_options,
             label_visibility="collapsed"
         )
         
@@ -92,6 +125,11 @@ def render_sidebar():
         # Filters (only show on View Complaints page)
         if page == "View Complaints":
             st.title("🔍 Filters")
+            
+            # Show only own complaints option for citizens
+            if st.session_state.user and st.session_state.user.is_citizen():
+                show_only_own = st.checkbox("Show only my complaints", value=False)
+                st.session_state.show_only_own = show_only_own
             
             # Tag filter
             from config.settings import DEFAULT_TAGS
@@ -147,7 +185,10 @@ def render_view_page():
     # Get complaints based on filters
     complaints = []
     
-    if search_term:
+    # Filter by user if citizen viewing only own complaints
+    if hasattr(st.session_state, 'show_only_own') and st.session_state.show_only_own:
+        complaints = service.get_complaints_by_user(st.session_state.user.id)
+    elif search_term:
         complaints = service.search_complaints(search_term)
     elif st.session_state.date_range:
         start_date, end_date = st.session_state.date_range
@@ -181,11 +222,16 @@ def render_view_page():
         for complaint in complaints:
             render_complaint_card(complaint, show_image=True)
             
-            # Action buttons
+            # Action buttons (with permission checks)
+            current_user = st.session_state.user
+            can_update = check_permission(current_user, "update_status", complaint.user_id)
+            can_delete = check_permission(current_user, "delete", complaint.user_id)
+            is_own = complaint.user_id == current_user.id
+            
             col1, col2, col3 = st.columns([1, 1, 4])
             
             with col1:
-                if complaint.status != 'resolved':
+                if complaint.status != 'resolved' and can_update:
                     new_status = 'in_progress' if complaint.status == 'pending' else 'resolved'
                     if st.button(f"Mark as {new_status.replace('_', ' ').title()}", key=f"status_{complaint.id}"):
                         if service.update_status(complaint.id, new_status):
@@ -193,12 +239,13 @@ def render_view_page():
                             st.rerun()
             
             with col2:
-                if st.button("🗑️ Delete", key=f"delete_{complaint.id}"):
-                    if service.delete_complaint(complaint.id):
-                        st.success("Complaint deleted")
-                        st.rerun()
-                    else:
-                        st.error("Failed to delete complaint")
+                if can_delete:
+                    if st.button("🗑️ Delete", key=f"delete_{complaint.id}"):
+                        if service.delete_complaint(complaint.id):
+                            st.success("Complaint deleted")
+                            st.rerun()
+                        else:
+                            st.error("Failed to delete complaint")
             
             st.divider()
 
@@ -307,13 +354,25 @@ def main():
     # Apply theme
     apply_theme(st.session_state.theme)
     
+    # Check if user is authenticated
+    if not st.session_state.authenticated:
+        # Show login or signup page
+        if st.session_state.show_signup:
+            render_signup_page()
+        else:
+            render_login_page()
+        return
+    
     # Render header
     render_header()
+    
+    # Render user profile in sidebar
+    render_user_profile()
     
     # Render sidebar and get selected page
     page = render_sidebar()
     
-    # Render selected page
+    # Render selected page based on user role
     if page == "Submit Complaint":
         render_submit_page()
     elif page == "View Complaints":
@@ -322,6 +381,18 @@ def main():
         render_map_page()
     elif page == "Statistics":
         render_stats_page()
+    elif page == "Admin Dashboard":
+        # Only accessible to admins
+        if st.session_state.user.is_admin():
+            render_admin_dashboard()
+        else:
+            st.error("⛔ Access Denied: Admin privileges required")
+    elif page == "Moderator Panel":
+        # Accessible to moderators and admins
+        if st.session_state.user.can_access_admin_panel():
+            render_moderator_panel()
+        else:
+            st.error("⛔ Access Denied: Moderator privileges required")
 
 
 if __name__ == "__main__":
