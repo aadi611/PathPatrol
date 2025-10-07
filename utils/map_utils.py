@@ -7,13 +7,14 @@ from typing import List
 from database.models import Complaint
 
 
-def create_complaints_map(complaints: List[Complaint], center: tuple = None):
+def create_complaints_map(complaints: List[Complaint], center: tuple = None, use_clustering: bool = True):
     """
     Create an interactive map with complaint markers
     
     Args:
         complaints: List of Complaint objects
         center: Tuple of (lat, lon) for map center
+        use_clustering: Enable marker clustering for better performance
         
     Returns:
         Folium map object
@@ -45,6 +46,17 @@ def create_complaints_map(complaints: List[Complaint], center: tuple = None):
         tiles='CartoDB dark_matter'  # Dark theme map
     )
     
+    # Add marker clustering if enabled (better for 50+ markers)
+    if use_clustering and len(valid_complaints) > 20:
+        marker_cluster = plugins.MarkerCluster(
+            name='Complaints',
+            overlay=True,
+            control=True,
+            icon_create_function=None
+        ).add_to(m)
+    else:
+        marker_cluster = m  # Add directly to map
+    
     # Color mapping for status
     status_colors = {
         'pending': 'red',
@@ -73,25 +85,7 @@ def create_complaints_map(complaints: List[Complaint], center: tuple = None):
             popup=folium.Popup(popup_html, max_width=300),
             tooltip=f"Complaint #{complaint.id} - {complaint.status.title()}",
             icon=folium.Icon(color=color, icon='info-sign')
-        ).add_to(m)
-    
-    # Add marker cluster for better visualization
-    if len(valid_complaints) > 20:
-        marker_cluster = plugins.MarkerCluster().add_to(m)
-        for complaint in valid_complaints:
-            color = status_colors.get(complaint.status, 'gray')
-            popup_html = f"""
-            <div style='width: 200px'>
-                <h4>Complaint #{complaint.id}</h4>
-                <p><b>Status:</b> {complaint.status.replace('_', ' ').title()}</p>
-                <p><b>Location:</b> {complaint.location}</p>
-            </div>
-            """
-            folium.Marker(
-                location=[complaint.latitude, complaint.longitude],
-                popup=folium.Popup(popup_html, max_width=300),
-                icon=folium.Icon(color=color, icon='info-sign')
-            ).add_to(marker_cluster)
+        ).add_to(marker_cluster)  # Add to cluster or map
     
     # Add fullscreen option
     plugins.Fullscreen().add_to(m)
