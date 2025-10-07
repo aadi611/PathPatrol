@@ -33,6 +33,11 @@ from ui.admin_components import (
     render_admin_dashboard,
     render_moderator_panel
 )
+from utils.pwa_utils import (
+    inject_pwa_code,
+    add_manifest_link,
+    render_pwa_install_prompt
+)
 
 
 # Initialize application
@@ -47,6 +52,10 @@ def init_app():
     
     # Initialize directories
     init_directories()
+    
+    # Inject PWA code and manifest
+    add_manifest_link()
+    inject_pwa_code()
     
     # Initialize session state
     if 'theme' not in st.session_state:
@@ -145,6 +154,21 @@ def render_sidebar():
                 options=["All", "Pending", "In Progress", "Resolved"]
             )
             st.session_state.status_filter = None if status_filter == "All" else status_filter.lower().replace(' ', '_')
+        
+        st.divider()
+        
+        # PWA Install Prompt (only show if not running as PWA)
+        with st.expander("📱 Install App", expanded=False):
+            st.markdown("""
+            **Install PathPatrol on your device!**
+            
+            ✅ Quick access from home screen  
+            ✅ Works offline  
+            ✅ Get push notifications  
+            ✅ Faster performance
+            
+            Click the "Install" button in your browser or look for the install icon.
+            """)
         
         st.divider()
         
