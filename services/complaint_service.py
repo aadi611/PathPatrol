@@ -7,9 +7,9 @@ from .storage_service import StorageService
 from .email_service import EmailService
 import os
 
+    class ComplaintService:
+    """Handles complaint-related business logic"""
 
-
-    
     def __init__(self):
         """Initialize complaint service"""
         self.db = DatabaseManager()
