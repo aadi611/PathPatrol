@@ -8,7 +8,7 @@ from typing import Optional, List
 @dataclass
 class Complaint:
     """Complaint data model"""
-    
+    id: Optional[int] = None
     photo_path: str = ""  # Can be multiple paths separated by semicolon
     location: str = ""
     latitude: Optional[float] = None
