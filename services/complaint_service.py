@@ -8,8 +8,7 @@ from .email_service import EmailService
 import os
 
 
-class ComplaintService:
-    """Handles complaint-related business logic"""
+
     
     def __init__(self):
         """Initialize complaint service"""
