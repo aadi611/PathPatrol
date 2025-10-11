@@ -39,21 +39,4 @@ class Complaint:
         """Convert photo paths list to string"""
         self.photo_path = ';'.join(paths_list)
     
-    def to_dict(self):
-        """Convert to dictionary"""
-        return {
-            'id': self.id,
-            'photo_path': self.photo_path,
-            'location': self.location,
-            'latitude': self.latitude,
-            'longitude': self.longitude,
-            'tags': self.tags,
-            'description': self.description,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'status': self.status,
-            'resolved_at': self.resolved_at.isoformat() if self.resolved_at else None,
-            'resolution_time_hours': self.resolution_time_hours,
-            'user_id': self.user_id,
-            'assigned_to': self.assigned_to,
-            'updated_by': self.updated_by
-        }
+   
