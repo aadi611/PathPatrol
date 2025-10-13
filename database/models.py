@@ -1,7 +1,7 @@
 """
 Database models for the Pothole Complaint Portal
 """
-from dataclasses import dataclas
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, List
 
