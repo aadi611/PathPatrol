@@ -24,14 +24,14 @@ PAGE_LAYOUT = "wide"
 # Theme colors - Dark mode only
 THEMES = {
     "dark": {
-        "primary": "#1E3A8A",
+        "primary": "#1E3A7A",
         "secondary": "#3B82F6",
         "background": "#0F172A",
         "surface": "#1E293B",
-        "text": "#F1F5F9",
+        "text": "#F1F5F8",
         "text_secondary": "#94A3B8",
-        "border": "#334155",
-        "accent": "#60A5FA"
+        "border": "#334157",
+        "accent": "#60A5FB"
     }
 }
 
