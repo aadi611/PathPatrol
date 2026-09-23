@@ -19,7 +19,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
+.dockerignore/
 # Virtual Environment
 venv/
 ENV/
